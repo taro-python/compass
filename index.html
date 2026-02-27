@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>MIL Compass</title>
+    <title>MIL Compass (Map-Up)</title>
     <script src="https://cdn.jsdelivr.net/npm/mgrs@1.0.0/dist/mgrs.min.js"></script>
     <style>
         body { 
@@ -13,28 +13,115 @@
         
         #mgrs-display { position: absolute; top: 10px; right: 10px; font-size: 0.9rem; text-align: right; line-height: 1.2; }
 
-        /* コンパスの円本体 */
+        /* コンパスの円本体: rotateが効くように transition を追加 */
         #compass-face {
             width: 300px; height: 300px;
             border: 4px solid #00ff00; border-radius: 50%;
             position: relative;
             margin-top: 50px;
+            transition: transform 0.1s linear; /* 回転を滑らかにする */
         }
 
-        /* 方位ラベル（N, E, S, W）を円の外側に配置 */
+        /* 方位ラベル */
         .label { 
             position: absolute; color: #00ff00; font-weight: bold; font-size: 1.4rem;
-            pointer-events: none; /* クリックを邪魔しないようにする */
+            pointer-events: none; 
         }
-        /* top, bottom, left, rightの値をマイナスにして、円の外に出す */
         #label-n { top: -40px; left: 50%; transform: translateX(-50%); }
         #label-e { right: -35px; top: 50%; transform: translateY(-50%); }
         #label-s { bottom: -40px; left: 50%; transform: translateX(-50%); }
         #label-w { left: -35px; top: 50%; transform: translateY(-50%); }
 
+        /* 針: 回転させず、常に中央下部を起点に上を向かせる */
         #needle {
             width: 4px; height: 120px;
             background: #ff0000;
+            position: absolute;
+            left: 50%; bottom: 50%;
+            transform-origin: bottom center;
+            transform: translateX(-50%);
+        }
+
+        .tick-container { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
+        .tick { width: 2px; height: 15px; background: #00ff00; margin: 0 auto; }
+        .long-tick { height: 30px; background: #ffffff; width: 3px; }
+
+        #display { font-size: 3rem; margin-top: 40px; }
+    </style>
+</head>
+<body>
+
+    <div id="mgrs-display">MGRS: START...</div>
+
+    <div id="compass-face">
+        <div class="label" id="label-n">N</div>
+        <div class="label" id="label-e">E</div>
+        <div class="label" id="label-s">S</div>
+        <div class="label" id="label-w">W</div>
+        
+        <div id="needle"></div>
+    </div>
+    
+    <div id="display">0000 MIL</div>
+    <button id="start-btn" style="padding:20px; font-size:1.2rem; margin-top:30px;">起動 (センサー許可)</button>
+
+    <script>
+        const face = document.getElementById('compass-face');
+        const display = document.getElementById('display');
+        const btn = document.getElementById('start-btn');
+        const mgrsText = document.getElementById('mgrs-display');
+
+        // メモリ描画
+        for (let i = 0; i < 32; i++) {
+            const container = document.createElement('div');
+            container.className = 'tick-container';
+            container.style.transform = `rotate(${i * 11.25}deg)`;
+            
+            const tick = document.createElement('div');
+            if ((i * 200) % 800 === 0) {
+                tick.className = 'tick long-tick';
+            } else {
+                tick.className = 'tick';
+            }
+            container.appendChild(tick);
+            face.appendChild(container);
+        }
+
+        btn.addEventListener('click', async () => {
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                const p1 = await DeviceOrientationEvent.requestPermission();
+                if (p1 !== 'granted') return;
+            }
+            
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition((pos) => {
+                    try {
+                        const coords = [pos.coords.longitude, pos.coords.latitude];
+                        const mgrsResult = mgrs.forward(coords);
+                        mgrsText.innerText = `MGRS:\n${mgrsResult}`;
+                    } catch(e) { mgrsText.innerText = "MGRS Error"; }
+                }, () => { mgrsText.innerText = "GPS Error"; }, { enableHighAccuracy: true });
+            }
+
+            btn.style.display = 'none';
+            startCompass();
+        });
+
+        function startCompass() {
+            window.addEventListener('deviceorientation', (event) => {
+                let heading = event.webkitCompassHeading;
+                if (heading !== null) {
+                    // 盤面を回転させて「北」を常に上に持ってくる
+                    face.style.transform = `rotate(-${heading}deg)`;
+                    
+                    let mils = Math.round(heading * (6400 / 360));
+                    display.innerText = mils.toString().padStart(4, '0') + " MIL";
+                }
+            });
+        }
+    </script>
+</body>
+</html>            background: #ff0000;
             position: absolute;
             left: 50%; bottom: 50%;
             transform-origin: bottom center;
