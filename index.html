@@ -1,49 +1,66 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Compass Debug</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>MIL Compass</title>
+    <style>
+        body { background: #222; color: #0f0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: monospace; }
+        /* コンパスの見た目 */
+        #compass-container {
+            width: 300px; height: 300px;
+            border: 5px solid #0f0; border-radius: 50%;
+            position: relative;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 20px;
+        }
+        /* 回転する針（ここを画像に差し替えられます） */
+        #needle {
+            width: 10px; height: 150px;
+            background: #f00;
+            position: absolute;
+            top: 0;
+            transition: transform 0.1s ease-out; /* 回転を滑らかにする */
+        }
+        #display { font-size: 3rem; }
+    </style>
 </head>
-<body style="background:#000; color:#0f0; font-family:monospace; padding:20px;">
-    <h1>Debug: <span id="status">待機中</span></h1>
-    <div style="font-size: 3rem;">ミル: <span id="mils">--</span></div>
-    <div style="margin-top:20px;">
-        <button id="start-btn" style="padding:20px; font-size:1.5rem;">センサー起動</button>
+<body>
+
+    <div id="compass-container">
+        <div id="needle"></div>
     </div>
+    <div id="display">0000 MIL</div>
+    <button id="start-btn" style="padding:15px; margin-top:20px;">コンパスを起動</button>
 
     <script>
         const btn = document.getElementById('start-btn');
-        const status = document.getElementById('status');
-        const milsText = document.getElementById('mils');
+        const needle = document.getElementById('needle');
+        const display = document.getElementById('display');
 
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                status.innerText = "許可を確認中...";
-                DeviceOrientationEvent.requestPermission()
-                    .then(response => {
-                        if (response === 'granted') {
-                            status.innerText = "許可済み！";
-                            window.addEventListener('deviceorientation', handleOrientation);
-                        } else {
-                            status.innerText = "許可が拒否されました";
-                        }
-                    })
-                    .catch(e => status.innerText = "エラー: " + e);
+                const permission = await DeviceOrientationEvent.requestPermission();
+                if (permission === 'granted') {
+                    startCompass();
+                }
             } else {
-                status.innerText = "許可不要デバイス";
-                window.addEventListener('deviceorientation', handleOrientation);
+                startCompass();
             }
         });
 
-        function handleOrientation(event) {
-            let heading = event.webkitCompassHeading;
-            if (heading !== null) {
-                let mils = Math.round(heading * (6400 / 360));
-                milsText.innerText = mils;
-                status.innerText = "動作中";
-            } else {
-                status.innerText = "センサー値が取得できません（iPhone以外？）";
-            }
+        function startCompass() {
+            btn.style.display = 'none';
+            window.addEventListener('deviceorientation', (event) => {
+                let heading = event.webkitCompassHeading;
+                if (heading !== undefined && heading !== null) {
+                    // 1. 針を回転させる (CSSのrotate)
+                    needle.style.transform = `rotate(${heading}deg)`;
+                    
+                    // 2. ミルを計算して表示
+                    let mils = Math.round(heading * (6400 / 360));
+                    display.innerText = mils.toString().padStart(4, '0') + " MIL";
+                }
+            });
         }
     </script>
 </body>
