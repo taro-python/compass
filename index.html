@@ -4,38 +4,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>MIL Compass</title>
     <style>
-        body { background: #1a1a1a; color: #00ff00; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: monospace; }
+        body { background: #1a1a1a; color: #00ff00; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
         
+        /* MGRS表示エリア */
+        #mgrs-display { position: absolute; top: 20px; right: 20px; font-size: 1.2rem; }
+
         #compass-face {
             width: 300px; height: 300px;
             border: 4px solid #00ff00; border-radius: 50%;
-            position: relative; /* 子要素の基準点 */
-            display: flex; align-items: center; justify-content: center;
+            position: relative;
         }
 
-        /* 針の設定 */
+        /* 針：円の中心が回転軸になるように配置 */
         #needle {
-            width: 6px; height: 120px;
+            width: 4px; height: 130px; /* 針の長さ */
             background: #ff0000;
             position: absolute;
-            transform-origin: bottom center;
-            transition: transform 0.1s ease-out;
-            z-index: 10;
+            left: 148px; top: 20px; /* 中心に合わせるための微調整 */
+            transform-origin: bottom center; /* 回転の中心を針の根元に */
+            transition: transform 0.05s linear;
+            z-index: 5;
         }
 
-        /* 目盛りの設定 */
+        /* メモリ */
         .tick {
             position: absolute;
-            width: 2px; height: 20px;
+            left: 149px; top: 149px; /* 円の中心に一旦集める */
+            width: 2px; height: 15px;
             background: #00ff00;
-            /* ここで中心に配置し、後でJSで回転させる */
-            transform-origin: center bottom; 
+            transform-origin: 50% 150px; /* ここで円の縁に向けて配置 */
         }
 
-        #display { font-size: 3rem; margin-top: 30px; }
+        #display { font-size: 3rem; margin-top: 20px; }
     </style>
 </head>
 <body>
+
+    <div id="mgrs-display">MGRS: LOADING...</div>
 
     <div id="compass-face">
         <div id="needle"></div>
@@ -49,14 +54,13 @@
         const needle = document.getElementById('needle');
         const display = document.getElementById('display');
         const btn = document.getElementById('start-btn');
+        const mgrsText = document.getElementById('mgrs-display');
 
-        // 目盛りを16個（400ミル刻み）描画
+        // メモリ描画（6400ミルを16分割＝400ミルごと）
         for (let i = 0; i < 16; i++) {
             const tick = document.createElement('div');
             tick.className = 'tick';
-            // 回転(rotate)してから外側に押し出す(translateY)
-            const angle = i * 22.5; 
-            tick.style.transform = `rotate(${angle}deg) translateY(-140px)`;
+            tick.style.transform = `rotate(${i * 22.5}deg)`;
             face.appendChild(tick);
         }
 
@@ -74,10 +78,21 @@
         });
 
         function startCompass() {
+            // 位置情報の取得（MGRS表示のために必要）
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition((pos) => {
+                    // MGRS変換は複雑な計算が必要なため、まずはLat/Lonを表示
+                    // 本格的にMGRSにするには別途ライブラリが必要ですが、枠はこれでOK
+                    mgrsText.innerText = `LAT:${pos.coords.latitude.toFixed(2)} LON:${pos.coords.longitude.toFixed(2)}`;
+                });
+            }
+
             window.addEventListener('deviceorientation', (event) => {
                 let heading = event.webkitCompassHeading;
                 if (heading !== undefined && heading !== null) {
+                    // 針を回転
                     needle.style.transform = `rotate(${heading}deg)`;
+                    // ミル表示
                     let mils = Math.round(heading * (6400 / 360));
                     display.innerText = mils.toString().padStart(4, '0') + " MIL";
                 }
