@@ -6,33 +6,38 @@
     <style>
         body { background: #1a1a1a; color: #00ff00; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
         
-        /* MGRS表示エリア */
-        #mgrs-display { position: absolute; top: 20px; right: 20px; font-size: 1.2rem; }
+        /* 右上の座標表示 */
+        #mgrs-display { position: absolute; top: 10px; right: 10px; font-size: 0.9rem; text-align: right; }
 
         #compass-face {
             width: 300px; height: 300px;
             border: 4px solid #00ff00; border-radius: 50%;
-            position: relative;
+            position: relative; /* 子要素の基準 */
         }
 
-        /* 針：円の中心が回転軸になるように配置 */
+        /* 針：中心を軸に回転 */
         #needle {
-            width: 4px; height: 130px; /* 針の長さ */
+            width: 4px; height: 120px;
             background: #ff0000;
             position: absolute;
-            left: 148px; top: 20px; /* 中心に合わせるための微調整 */
-            transform-origin: bottom center; /* 回転の中心を針の根元に */
-            transition: transform 0.05s linear;
-            z-index: 5;
+            left: 50%; top: 50%; /* ど真ん中へ */
+            margin-left: -2px; /* 針の太さの半分だけ左にずらす */
+            margin-top: -120px; /* 針の長さ分だけ上にずらす（ここが軸） */
+            transform-origin: bottom center;
+            transition: transform 0.1s linear;
         }
 
-        /* メモリ */
-        .tick {
+        /* メモリのコンテナ（回転の軸） */
+        .tick-container {
             position: absolute;
-            left: 149px; top: 149px; /* 円の中心に一旦集める */
+            width: 100%; height: 100%;
+            top: 0; left: 0;
+        }
+        /* メモリの本体 */
+        .tick {
             width: 2px; height: 15px;
             background: #00ff00;
-            transform-origin: 50% 150px; /* ここで円の縁に向けて配置 */
+            margin: 0 auto; /* 中央寄せ */
         }
 
         #display { font-size: 3rem; margin-top: 20px; }
@@ -40,7 +45,7 @@
 </head>
 <body>
 
-    <div id="mgrs-display">MGRS: LOADING...</div>
+    <div id="mgrs-display">LOC: WAITING...</div>
 
     <div id="compass-face">
         <div id="needle"></div>
@@ -56,43 +61,42 @@
         const btn = document.getElementById('start-btn');
         const mgrsText = document.getElementById('mgrs-display');
 
-        // メモリ描画（6400ミルを16分割＝400ミルごと）
-        for (let i = 0; i < 16; i++) {
+        // メモリを32個（200ミル刻み）描画
+        for (let i = 0; i < 32; i++) {
+            const container = document.createElement('div');
+            container.className = 'tick-container';
+            container.style.transform = `rotate(${i * (360/32)}deg)`;
+            
             const tick = document.createElement('div');
             tick.className = 'tick';
-            tick.style.transform = `rotate(${i * 22.5}deg)`;
-            face.appendChild(tick);
+            container.appendChild(tick);
+            face.appendChild(container);
         }
 
         btn.addEventListener('click', async () => {
+            // 1. センサー許可
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                const permission = await DeviceOrientationEvent.requestPermission();
-                if (permission === 'granted') {
-                    btn.style.display = 'none';
-                    startCompass();
-                }
-            } else {
-                btn.style.display = 'none';
-                startCompass();
+                const p1 = await DeviceOrientationEvent.requestPermission();
+                if (p1 !== 'granted') return;
             }
+            
+            // 2. 位置情報許可
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    mgrsText.innerText = `LAT:${pos.coords.latitude.toFixed(4)}\nLON:${pos.coords.longitude.toFixed(4)}`;
+                },
+                (err) => { mgrsText.innerText = "GPS Error"; }
+            );
+
+            btn.style.display = 'none';
+            startCompass();
         });
 
         function startCompass() {
-            // 位置情報の取得（MGRS表示のために必要）
-            if (navigator.geolocation) {
-                navigator.geolocation.watchPosition((pos) => {
-                    // MGRS変換は複雑な計算が必要なため、まずはLat/Lonを表示
-                    // 本格的にMGRSにするには別途ライブラリが必要ですが、枠はこれでOK
-                    mgrsText.innerText = `LAT:${pos.coords.latitude.toFixed(2)} LON:${pos.coords.longitude.toFixed(2)}`;
-                });
-            }
-
             window.addEventListener('deviceorientation', (event) => {
                 let heading = event.webkitCompassHeading;
-                if (heading !== undefined && heading !== null) {
-                    // 針を回転
+                if (heading !== null) {
                     needle.style.transform = `rotate(${heading}deg)`;
-                    // ミル表示
                     let mils = Math.round(heading * (6400 / 360));
                     display.innerText = mils.toString().padStart(4, '0') + " MIL";
                 }
