@@ -1,62 +1,49 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MIL Compass</title>
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <style>
-        body { background: #1a1a1a; color: #00ff00; font-family: monospace; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        #display { font-size: 5rem; font-weight: bold; margin-bottom: 10px; }
-        #unit { font-size: 1.5rem; border-top: 1px solid #00ff00; padding-top: 5px; }
-        button { padding: 15px 30px; font-size: 1.2rem; background: #00ff00; color: #1a1a1a; border: none; border-radius: 5px; cursor: pointer; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compass Debug</title>
 </head>
-<body>
-
-    <div id="app-ui" style="display:none;">
-        <div id="display">0</div>
-        <div id="unit">MIL (NATO 6400)</div>
+<body style="background:#000; color:#0f0; font-family:monospace; padding:20px;">
+    <h1>Debug: <span id="status">待機中</span></h1>
+    <div style="font-size: 3rem;">ミル: <span id="mils">--</span></div>
+    <div style="margin-top:20px;">
+        <button id="start-btn" style="padding:20px; font-size:1.5rem;">センサー起動</button>
     </div>
 
-    <button id="start-btn">コンパスを起動する</button>
-
     <script>
-        const startBtn = document.getElementById('start-btn');
-        const appUi = document.getElementById('app-ui');
-        const display = document.getElementById('display');
+        const btn = document.getElementById('start-btn');
+        const status = document.getElementById('status');
+        const milsText = document.getElementById('mils');
 
-        startBtn.addEventListener('click', async () => {
-            // iPhoneのセンサー使用許可をもらう儀式
+        btn.addEventListener('click', () => {
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                const permission = await DeviceOrientationEvent.requestPermission();
-                if (permission === 'granted') {
-                    startCompass();
-                } else {
-                    alert('センサーの利用が拒否されました');
-                }
+                status.innerText = "許可を確認中...";
+                DeviceOrientationEvent.requestPermission()
+                    .then(response => {
+                        if (response === 'granted') {
+                            status.innerText = "許可済み！";
+                            window.addEventListener('deviceorientation', handleOrientation);
+                        } else {
+                            status.innerText = "許可が拒否されました";
+                        }
+                    })
+                    .catch(e => status.innerText = "エラー: " + e);
             } else {
-                // iPhone以外（PCなど）の場合
-                startCompass();
+                status.innerText = "許可不要デバイス";
+                window.addEventListener('deviceorientation', handleOrientation);
             }
         });
 
-        function startCompass() {
-            startBtn.style.display = 'none';
-            appUi.style.display = 'block';
-
-            window.addEventListener('deviceorientationwebkit', (event) => {
-                // webkitCompassHeadingはiPhone専用の「真北」基準の角度
-                let degrees = event.webkitCompassHeading;
-                if (degrees !== undefined) {
-                    // ミルに変換して四捨五入
-                    let mils = Math.round(degrees * (6400 / 360));
-                    // 6400に達したら0に戻す処理
-                    if (mils >= 6400) mils = 0;
-                    display.innerText = mils.toString().padStart(4, '0');
-                }
-            }, false);
+        function handleOrientation(event) {
+            let heading = event.webkitCompassHeading;
+            if (heading !== null) {
+                let mils = Math.round(heading * (6400 / 360));
+                milsText.innerText = mils;
+                status.innerText = "動作中";
+            } else {
+                status.innerText = "センサー値が取得できません（iPhone以外？）";
+            }
         }
     </script>
 </body>
