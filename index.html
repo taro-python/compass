@@ -5,7 +5,11 @@
     <title>MIL Compass</title>
     <script src="https://cdn.jsdelivr.net/npm/mgrs@1.0.0/dist/mgrs.min.js"></script>
     <style>
-        body { background: #1a1a1a; color: #00ff00; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        body { 
+            background: #1a1a1a; color: #00ff00; font-family: monospace; 
+            display: flex; flex-direction: column; align-items: center; 
+            justify-content: center; height: 100vh; margin: 0; overflow: hidden; 
+        }
         
         #mgrs-display { position: absolute; top: 10px; right: 10px; font-size: 0.9rem; text-align: right; line-height: 1.2; }
 
@@ -15,6 +19,16 @@
             position: relative;
             margin-top: 50px;
         }
+
+        /* 方位ラベルのデザイン */
+        .label { 
+            position: absolute; color: #ffffff; font-weight: bold; font-size: 1.2rem;
+            pointer-events: none; /* クリックを邪魔しないようにする */
+        }
+        #label-n { top: 10px; left: 50%; transform: translateX(-50%); }
+        #label-e { right: 10px; top: 50%; transform: translateY(-50%); }
+        #label-s { bottom: 10px; left: 50%; transform: translateX(-50%); }
+        #label-w { left: 10px; top: 50%; transform: translateY(-50%); }
 
         #needle {
             width: 4px; height: 120px;
@@ -27,11 +41,7 @@
         }
 
         .tick-container { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
-        
-        /* 通常のメモリ */
         .tick { width: 2px; height: 15px; background: #00ff00; margin: 0 auto; }
-        
-        /* 800ミルごとの長いメモリ */
         .long-tick { height: 30px; background: #ffffff; width: 3px; }
 
         #display { font-size: 3rem; margin-top: 40px; }
@@ -42,6 +52,11 @@
     <div id="mgrs-display">MGRS: START...</div>
 
     <div id="compass-face">
+        <div class="label" id="label-n">N</div>
+        <div class="label" id="label-e">E</div>
+        <div class="label" id="label-s">S</div>
+        <div class="label" id="label-w">W</div>
+        
         <div id="needle"></div>
     </div>
     
@@ -62,23 +77,23 @@
             container.style.transform = `rotate(${i * 11.25}deg)`;
             
             const tick = document.createElement('div');
-            // 800ミルごとの判定: (i * 200) が800で割り切れるか
             if ((i * 200) % 800 === 0) {
                 tick.className = 'tick long-tick';
             } else {
                 tick.className = 'tick';
             }
-            
             container.appendChild(tick);
             face.appendChild(container);
         }
 
         btn.addEventListener('click', async () => {
+            // iPhoneでのセンサー許可
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                 const p1 = await DeviceOrientationEvent.requestPermission();
                 if (p1 !== 'granted') return;
             }
             
+            // 位置情報取得 (GPS)
             if (navigator.geolocation) {
                 navigator.geolocation.watchPosition((pos) => {
                     try {
@@ -86,7 +101,7 @@
                         const mgrsResult = mgrs.forward(coords);
                         mgrsText.innerText = `MGRS:\n${mgrsResult}`;
                     } catch(e) { mgrsText.innerText = "MGRS Error"; }
-                });
+                }, () => { mgrsText.innerText = "GPS Error"; }, { enableHighAccuracy: true });
             }
 
             btn.style.display = 'none';
