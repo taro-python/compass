@@ -13,6 +13,7 @@
         
         #mgrs-display { position: absolute; top: 10px; right: 10px; font-size: 0.9rem; text-align: right; line-height: 1.2; }
 
+        /* コンパスの円本体 */
         #compass-face {
             width: 300px; height: 300px;
             border: 4px solid #00ff00; border-radius: 50%;
@@ -20,15 +21,16 @@
             margin-top: 50px;
         }
 
-        /* 方位ラベルのデザイン */
+        /* 方位ラベル（N, E, S, W）を円の外側に配置 */
         .label { 
-            position: absolute; color: #ffffff; font-weight: bold; font-size: 1.2rem;
+            position: absolute; color: #00ff00; font-weight: bold; font-size: 1.4rem;
             pointer-events: none; /* クリックを邪魔しないようにする */
         }
-        #label-n { top: 10px; left: 50%; transform: translateX(-50%); }
-        #label-e { right: 10px; top: 50%; transform: translateY(-50%); }
-        #label-s { bottom: 10px; left: 50%; transform: translateX(-50%); }
-        #label-w { left: 10px; top: 50%; transform: translateY(-50%); }
+        /* top, bottom, left, rightの値をマイナスにして、円の外に出す */
+        #label-n { top: -40px; left: 50%; transform: translateX(-50%); }
+        #label-e { right: -35px; top: 50%; transform: translateY(-50%); }
+        #label-s { bottom: -40px; left: 50%; transform: translateX(-50%); }
+        #label-w { left: -35px; top: 50%; transform: translateY(-50%); }
 
         #needle {
             width: 4px; height: 120px;
