@@ -2,95 +2,124 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>MIL Compass with Map</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <title>MIL Compass</title>
     <script src="https://cdn.jsdelivr.net/npm/mgrs@1.0.0/dist/mgrs.min.js"></script>
-    
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: monospace; }
+        body { 
+            background: #1a1a1a; color: #00ff00; font-family: monospace; 
+            display: flex; flex-direction: column; align-items: center; 
+            justify-content: center; height: 100vh; margin: 0; overflow: hidden; 
+        }
         
-        /* 地図を画面全体に配置 */
-        #map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        
-        /* UIを地図の上に重ねる */
-        #ui-layer { position: relative; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; pointer-events: none; }
-        
-        /* 各要素はクリックできるようにポインターイベントを戻す */
-        #ui-layer > * { pointer-events: auto; }
+        #mgrs-display { position: absolute; top: 10px; right: 10px; font-size: 0.9rem; text-align: right; line-height: 1.2; }
 
-        #mgrs-display { position: absolute; top: 10px; right: 10px; font-size: 0.9rem; text-align: right; background: rgba(0,0,0,0.7); padding: 5px; color: #00ff00; }
-        
-        #compass-face { width: 250px; height: 250px; border: 4px solid #00ff00; border-radius: 50%; position: relative; background: rgba(0,0,0,0.5); }
+        /* コンパスの円本体 */
+        #compass-face {
+            width: 300px; height: 300px;
+            border: 4px solid #00ff00; border-radius: 50%;
+            position: relative;
+            margin-top: 50px;
+        }
 
-        .label { position: absolute; color: #00ff00; font-weight: bold; font-size: 1.4rem; }
-        #label-n { top: -35px; left: 50%; transform: translateX(-50%); }
-        #label-e { right: -30px; top: 50%; transform: translateY(-50%); }
-        #label-s { bottom: -35px; left: 50%; transform: translateX(-50%); }
-        #label-w { left: -30px; top: 50%; transform: translateY(-50%); }
+        /* 方位ラベル（N, E, S, W）を円の外側に配置 */
+        .label { 
+            position: absolute; color: #00ff00; font-weight: bold; font-size: 1.4rem;
+            pointer-events: none; /* クリックを邪魔しないようにする */
+        }
+        /* top, bottom, left, rightの値をマイナスにして、円の外に出す */
+        #label-n { top: -40px; left: 50%; transform: translateX(-50%); }
+        #label-e { right: -35px; top: 50%; transform: translateY(-50%); }
+        #label-s { bottom: -40px; left: 50%; transform: translateX(-50%); }
+        #label-w { left: -35px; top: 50%; transform: translateY(-50%); }
 
-        #needle { width: 4px; height: 100px; background: #ff0000; position: absolute; left: 50%; bottom: 50%; transform-origin: bottom center; transform: translateX(-50%); transition: transform 0.05s linear; }
+        #needle {
+            width: 4px; height: 120px;
+            background: #ff0000;
+            position: absolute;
+            left: 50%; bottom: 50%;
+            transform-origin: bottom center;
+            transform: translateX(-50%);
+            transition: transform 0.05s linear;
+        }
 
-        #display { font-size: 2.5rem; color: #00ff00; margin-top: 40px; background: rgba(0,0,0,0.7); padding: 10px; }
-        
-        button { padding: 20px; font-size: 1.2rem; margin-top: 20px; z-index: 20; }
+        .tick-container { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
+        .tick { width: 2px; height: 15px; background: #00ff00; margin: 0 auto; }
+        .long-tick { height: 30px; background: #ffffff; width: 3px; }
+
+        #display { font-size: 3rem; margin-top: 40px; }
     </style>
 </head>
 <body>
 
-    <div id="map"></div>
+    <div id="mgrs-display">MGRS: START...</div>
 
-    <div id="ui-layer">
-        <div id="mgrs-display">MGRS: START...</div>
-        <div id="compass-face">
-            <div class="label" id="label-n">N</div>
-            <div class="label" id="label-e">E</div>
-            <div class="label" id="label-s">S</div>
-            <div class="label" id="label-w">W</div>
-            <div id="needle"></div>
-        </div>
-        <div id="display">0000 MIL</div>
-        <button id="start-btn">起動 (センサー/GPS許可)</button>
+    <div id="compass-face">
+        <div class="label" id="label-n">N</div>
+        <div class="label" id="label-e">E</div>
+        <div class="label" id="label-s">S</div>
+        <div class="label" id="label-w">W</div>
+        
+        <div id="needle"></div>
     </div>
+    
+    <div id="display">0000 MIL</div>
+    <button id="start-btn" style="padding:20px; font-size:1.2rem; margin-top:30px;">起動 (センサー許可)</button>
 
     <script>
-        // 地図初期化
-        const map = L.map('map', { zoomControl: false }).setView([35.6895, 139.6917], 15);
-        L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
-            attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html'>国土地理院</a>"
-        }).addTo(map);
-
+        const face = document.getElementById('compass-face');
         const needle = document.getElementById('needle');
         const display = document.getElementById('display');
         const btn = document.getElementById('start-btn');
         const mgrsText = document.getElementById('mgrs-display');
 
+        // メモリ描画
+        for (let i = 0; i < 32; i++) {
+            const container = document.createElement('div');
+            container.className = 'tick-container';
+            container.style.transform = `rotate(${i * 11.25}deg)`;
+            
+            const tick = document.createElement('div');
+            if ((i * 200) % 800 === 0) {
+                tick.className = 'tick long-tick';
+            } else {
+                tick.className = 'tick';
+            }
+            container.appendChild(tick);
+            face.appendChild(container);
+        }
+
         btn.addEventListener('click', async () => {
+            // iPhoneでのセンサー許可
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                 const p1 = await DeviceOrientationEvent.requestPermission();
                 if (p1 !== 'granted') return;
             }
             
+            // 位置情報取得 (GPS)
             if (navigator.geolocation) {
                 navigator.geolocation.watchPosition((pos) => {
-                    const lat = pos.coords.latitude;
-                    const lon = pos.coords.longitude;
-                    map.setView([lat, lon]); // 地図の中心を現在地に
                     try {
-                        mgrsText.innerText = `MGRS:\n${mgrs.forward([lon, lat])}`;
-                    } catch(e) { mgrsText.innerText = "MGRS Err"; }
-                }, null, { enableHighAccuracy: true });
+                        const coords = [pos.coords.longitude, pos.coords.latitude];
+                        const mgrsResult = mgrs.forward(coords);
+                        mgrsText.innerText = `MGRS:\n${mgrsResult}`;
+                    } catch(e) { mgrsText.innerText = "MGRS Error"; }
+                }, () => { mgrsText.innerText = "GPS Error"; }, { enableHighAccuracy: true });
             }
+
             btn.style.display = 'none';
+            startCompass();
         });
 
-        window.addEventListener('deviceorientation', (event) => {
-            let heading = event.webkitCompassHeading;
-            if (heading !== null) {
-                needle.style.transform = `translateX(-50%) rotate(${heading}deg)`;
-                display.innerText = Math.round(heading * (6400 / 360)).toString().padStart(4, '0') + " MIL";
-            }
-        });
+        function startCompass() {
+            window.addEventListener('deviceorientation', (event) => {
+                let heading = event.webkitCompassHeading;
+                if (heading !== null) {
+                    needle.style.transform = `translateX(-50%) rotate(${heading}deg)`;
+                    let mils = Math.round(heading * (6400 / 360));
+                    display.innerText = mils.toString().padStart(4, '0') + " MIL";
+                }
+            });
+        }
     </script>
 </body>
 </html>
